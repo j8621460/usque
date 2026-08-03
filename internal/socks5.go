@@ -28,6 +28,11 @@ type SOCKS5Config struct {
 	TCPTimeout time.Duration // 0 = no deadline on TCP CONNECT relay
 	UDPTimeout time.Duration // 0 = no deadline on remote UDP reads
 	Logger     *log.Logger
+	// Listener is an optional pre-bound TCP listener. When non-nil, listenAndServe
+	// skips net.ListenTCP and uses it directly — supports Android socket-activation
+	// (--fd flag) so the port stays bound between process restarts and callers see
+	// zero 'connection refused' during re-launch.
+	Listener net.Listener
 }
 
 // SOCKS5Server wraps txthinking/socks5; DialTCP/DialUDP are package globals (last NewSOCKS5Server wins).
@@ -126,13 +131,21 @@ func (s *SOCKS5Server) listenAndServe() error {
 	srv := s.server
 	srv.Handle = socks5.Handler(s)
 
-	addr, err := net.ResolveTCPAddr("tcp", srv.Addr)
-	if err != nil {
-		return err
-	}
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return err
+	var l net.Listener
+	if s.cfg.Listener != nil {
+		// Socket-activation path: caller pre-bound the port and passes it in.
+		// The port never goes unbound between restarts — no connection-refused gap.
+		l = s.cfg.Listener
+	} else {
+		addr, err := net.ResolveTCPAddr("tcp", srv.Addr)
+		if err != nil {
+			return err
+		}
+		tcpl, err := net.ListenTCP("tcp", addr)
+		if err != nil {
+			return err
+		}
+		l = tcpl
 	}
 	srv.RunnerGroup.Add(&runnergroup.Runner{
 		Start: func() error {
