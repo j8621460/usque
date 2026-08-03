@@ -51,13 +51,7 @@ var httpProxyCmd = &cobra.Command{
 			return
 		}
 
-		insecure, err := cmd.Flags().GetBool("insecure")
-		if err != nil {
-			cmd.Printf("Failed to get insecure flag: %v\n", err)
-			return
-		}
-
-		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni, insecure)
+		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni)
 		if err != nil {
 			cmd.Printf("Failed to prepare TLS config: %v\n", err)
 			return
@@ -108,10 +102,6 @@ var httpProxyCmd = &cobra.Command{
 		if err != nil {
 			cmd.Printf("Failed to select endpoint: %v\n", err)
 			return
-		}
-
-		if insecure {
-			config.WarnInsecure()
 		}
 
 		if useHTTP2 {
@@ -445,7 +435,6 @@ func init() {
 	httpProxyCmd.Flags().DurationP("reconnect-delay", "r", 1*time.Second, "Delay between reconnect attempts")
 	httpProxyCmd.Flags().Bool("always-reconnect", false, "Always reconnect after tunnel loss, even when idle")
 	httpProxyCmd.Flags().Bool("http2", false, "Use HTTP/2 over TCP+TLS instead of HTTP/3 over QUIC."+config.EndpointHelpSuffixH2)
-	httpProxyCmd.Flags().Bool("insecure", false, "Disable endpoint certificate pinning and trust any certificate")
 	httpProxyCmd.Flags().BoolP("local-dns", "l", false, "Do not send proxy DNS through the tunnel; use -d over the host instead. Add --system-dns to use the OS resolver instead of -d")
 	httpProxyCmd.Flags().Bool("system-dns", false, "With -l, resolve names via the OS (e.g. /etc/resolv.conf) instead of -d")
 	httpProxyCmd.Flags().String("on-connect", "", "Path to an executable to run after each successful tunnel connect (no args; context via USQUE_* env vars)")
