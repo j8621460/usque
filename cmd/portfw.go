@@ -52,7 +52,13 @@ var portFwCmd = &cobra.Command{
 			return
 		}
 
-		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni)
+		insecure, err := cmd.Flags().GetBool("insecure")
+		if err != nil {
+			cmd.Printf("Failed to get insecure flag: %v\n", err)
+			return
+		}
+
+		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni, insecure)
 		if err != nil {
 			cmd.Printf("Failed to prepare TLS config: %v\n", err)
 			return
@@ -91,6 +97,10 @@ var portFwCmd = &cobra.Command{
 		if err != nil {
 			cmd.Printf("Failed to select endpoint: %v\n", err)
 			return
+		}
+
+		if insecure {
+			config.WarnInsecure()
 		}
 
 		if useHTTP2 {
@@ -404,6 +414,7 @@ func init() {
 	portFwCmd.Flags().Uint16P("initial-packet-size", "i", 0, "Custom initial packet size for MASQUE connection (default: auto with PMTU discovery)")
 	portFwCmd.Flags().DurationP("reconnect-delay", "r", 1*time.Second, "Delay between reconnect attempts")
 	portFwCmd.Flags().Bool("http2", false, "Use HTTP/2 over TCP+TLS instead of HTTP/3 over QUIC."+config.EndpointHelpSuffixH2)
+	portFwCmd.Flags().Bool("insecure", false, "Disable endpoint certificate pinning and trust any certificate")
 	portFwCmd.Flags().Bool("always-reconnect", false, "Always reconnect after tunnel loss, even when idle (default behavior in portfw)")
 	portFwCmd.Flags().Bool("dont-always-reconnect", false, "Disable always reconnect in portfw; reconnect only when new activity arrives")
 	portFwCmd.Flags().String("on-connect", "", "Path to an executable to run after each successful tunnel connect (no args; context via USQUE_* env vars)")

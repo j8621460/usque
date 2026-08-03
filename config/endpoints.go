@@ -19,6 +19,11 @@ func LogHTTP2Endpoint(endpoint net.Addr) {
 	log.Printf("Using HTTP/2 endpoint %s", endpoint.String())
 }
 
+// WarnInsecure prints a warning when certificate pinning is disabled.
+func WarnInsecure() {
+	log.Println("WARNING: --insecure is set, endpoint certificate pinning is disabled. Do not use in production!")
+}
+
 // SelectEndpointFromConfig returns a protocol-appropriate remote endpoint:
 // TCP for HTTP/2 mode and UDP for HTTP/3 mode.
 func SelectEndpointFromConfig(useHTTP2 bool, useIPv6 bool, port int) (net.Addr, error) {
