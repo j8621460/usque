@@ -25,6 +25,7 @@ type l4ProxyOptions struct {
 	useIPv6           bool
 	keepalivePeriod   time.Duration
 	initialPacketSize uint16
+	insecure          bool
 	localDNS          bool
 	systemDNS         bool
 	onConnect         string
@@ -69,6 +70,9 @@ func buildL4Proxy(cmd *cobra.Command, mode string) (l4ProxyOptions, *api.L4Proxy
 	if opts.initialPacketSize, err = cmd.Flags().GetUint16("initial-packet-size"); err != nil {
 		return opts, nil, fmt.Errorf("failed to get initial packet size: %v", err)
 	}
+	if opts.insecure, err = cmd.Flags().GetBool("insecure"); err != nil {
+		return opts, nil, fmt.Errorf("failed to get insecure flag: %v", err)
+	}
 	if opts.localDNS, err = cmd.Flags().GetBool("local-dns"); err != nil {
 		return opts, nil, fmt.Errorf("failed to get local-dns flag: %v", err)
 	}
@@ -98,10 +102,14 @@ func buildL4Proxy(cmd *cobra.Command, mode string) (l4ProxyOptions, *api.L4Proxy
 	if err != nil {
 		return opts, nil, fmt.Errorf("failed to generate cert: %v", err)
 	}
-	tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, internal.L4ConnectSNI)
+	tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, internal.L4ConnectSNI, opts.insecure)
 	if err != nil {
 		return opts, nil, fmt.Errorf("failed to prepare TLS config: %v", err)
 	}
+	if opts.insecure {
+		config.WarnInsecure()
+	}
+
 	endpointAddr, err := config.SelectEndpointFromConfig(false, opts.useIPv6, opts.connectPort)
 	if err != nil {
 		return opts, nil, fmt.Errorf("failed to select endpoint: %v", err)
@@ -203,6 +211,7 @@ func addL4ProxyFlags(cmd *cobra.Command, defaultPort, proxyName string) {
 	cmd.Flags().BoolP("ipv6", "6", false, "Use IPv6 for MASQUE connection")
 	cmd.Flags().DurationP("keepalive-period", "k", 30*time.Second, "Keepalive period for MASQUE connection")
 	cmd.Flags().Uint16P("initial-packet-size", "i", 0, "Custom initial packet size for MASQUE connection (default: auto with PMTU discovery)")
+	cmd.Flags().Bool("insecure", false, "Disable endpoint certificate pinning and trust any certificate")
 	cmd.Flags().BoolP("local-dns", "l", true, "Resolve proxy target names locally before opening L4 CONNECT streams (required for hostname targets)")
 	cmd.Flags().Bool("system-dns", false, "Resolve names via the OS (e.g. /etc/resolv.conf) instead of -d")
 	cmd.Flags().String("on-connect", "", "Path to an executable to run after each successful L4 CONNECT stream (no args; context via USQUE_* env vars)")
