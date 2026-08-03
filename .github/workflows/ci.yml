@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
+      - tests
   pull_request:
     branches:
       - main
+      - tests
+      
 
 permissions:
   contents: read
