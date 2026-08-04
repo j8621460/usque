@@ -150,9 +150,15 @@ func (s *SOCKS5Server) listenAndServe() error {
 	srv.RunnerGroup.Add(&runnergroup.Runner{
 		Start: func() error {
 			for {
-				c, err := l.AcceptTCP()
+				conn, err := l.Accept()
 				if err != nil {
 					return err
+				}
+				c, ok := conn.(*net.TCPConn)
+				if !ok {
+					log.Printf("SOCKS listener returned non-TCP connection %T from %s", conn, conn.RemoteAddr())
+					_ = conn.Close()
+					continue
 				}
 				go func(c *net.TCPConn) {
 					defer func() { _ = c.Close() }()
