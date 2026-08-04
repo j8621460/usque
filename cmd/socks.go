@@ -272,6 +272,31 @@ var socksCmd = &cobra.Command{
 			resolver.TunNet = tunNet
 		}
 
+		fdNum, err := cmd.Flags().GetInt("fd")
+		if err != nil {
+			cmd.Printf("Failed to get fd flag: %v\n", err)
+			return
+		}
+		var inheritedListener net.Listener
+		if fdNum >= 0 {
+			// Socket-activation: caller pre-bound the SOCKS port and passes us the fd.
+			// net.FileListener dups the fd internally; we close the os.File wrapper but
+			// the caller's original fd (and port binding) remains open.
+			f := os.NewFile(uintptr(fdNum), "inherited-fd")
+			if f == nil {
+				cmd.Printf("socks: --fd %d: os.NewFile returned nil\n", fdNum)
+				return
+			}
+			il, lerr := net.FileListener(f)
+			_ = f.Close() // closes the os.File but NOT the underlying fd
+			if lerr != nil {
+				cmd.Printf("socks: --fd %d: net.FileListener: %v\n", fdNum, lerr)
+				return
+			}
+			inheritedListener = il
+			log.Printf("socks: using inherited listener fd=%d addr=%s", fdNum, il.Addr())
+		}
+
 		server, err := internal.NewSOCKS5Server(internal.SOCKS5Config{
 			Addr:       net.JoinHostPort(bindAddress, port),
 			Username:   username,
@@ -279,6 +304,7 @@ var socksCmd = &cobra.Command{
 			Resolver:   resolver,
 			TunNet:     tunNet,
 			UDPTimeout: udpTimeout,
+			Listener:   inheritedListener,
 			Logger:     log.New(internal.NewTZStampWriter(os.Stderr), "socks5: ", 0),
 		})
 		if err != nil {
@@ -311,6 +337,7 @@ func init() {
 	socksCmd.Flags().Uint16P("initial-packet-size", "i", 0, "Custom initial packet size for MASQUE connection (default: auto with PMTU discovery)")
 	socksCmd.Flags().DurationP("reconnect-delay", "r", 1*time.Second, "Delay between reconnect attempts")
 	socksCmd.Flags().Duration("udp-timeout", 60*time.Second, "Idle read deadline for each remote UDP relay (SOCKS5 ASSOCIATE). Shorter frees memory sooner; raise (e.g. 300s) if a quiet peer needs longer silence. 0 disables the deadline and risks unbounded growth under DHT/uTP")
+	socksCmd.Flags().IntP("fd", "f", -1, "Pre-opened TCP listener fd to inherit (Android socket-activation). When >= 0, skips net.Listen and accepts on this fd directly. The fd must be a bound, listening TCP socket with O_CLOEXEC cleared. The port stays bound between process restarts — zero connection-refused gap.")
 	socksCmd.Flags().Bool("always-reconnect", false, "Always reconnect after tunnel loss, even when idle")
 	socksCmd.Flags().Bool("http2", false, "Use HTTP/2 over TCP+TLS instead of HTTP/3 over QUIC."+config.EndpointHelpSuffixH2)
 	socksCmd.Flags().Bool("insecure", false, "Disable endpoint certificate pinning and trust any certificate")
