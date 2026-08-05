@@ -53,13 +53,7 @@ var nativeTunCmd = &cobra.Command{
 			return
 		}
 
-		insecure, err := cmd.Flags().GetBool("insecure")
-		if err != nil {
-			cmd.Printf("Failed to get insecure flag: %v\n", err)
-			return
-		}
-
-		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni, insecure)
+		tlsConfig, err := api.PrepareTlsConfig(privKey, peerPubKey, cert, sni)
 		if err != nil {
 			cmd.Printf("Failed to prepare TLS config: %v\n", err)
 			return
@@ -98,10 +92,6 @@ var nativeTunCmd = &cobra.Command{
 		if err != nil {
 			cmd.Printf("Failed to select endpoint: %v\n", err)
 			return
-		}
-
-		if insecure {
-			config.WarnInsecure()
 		}
 
 		if useHTTP2 {
@@ -237,7 +227,6 @@ func init() {
 	nativeTunCmd.Flags().DurationP("reconnect-delay", "r", 1*time.Second, "Delay between reconnect attempts")
 	nativeTunCmd.Flags().Bool("always-reconnect", false, "Always reconnect after tunnel loss, even when idle")
 	nativeTunCmd.Flags().Bool("http2", false, "Use HTTP/2 over TCP+TLS instead of HTTP/3 over QUIC."+config.EndpointHelpSuffixH2)
-	nativeTunCmd.Flags().Bool("insecure", false, "Disable endpoint certificate pinning and trust any certificate")
 	nativeTunCmd.Flags().StringP("interface-name", "n", "", "Custom interface name for the TUN interface")
 	nativeTunCmd.Flags().Bool("persist", false, "Linux only: Keep the TUN interface after exit")
 	nativeTunCmd.Flags().String("on-connect", "", "Path to an executable to run after each successful tunnel connect (no args; context via USQUE_* env vars)")
