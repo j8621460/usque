@@ -18,6 +18,7 @@ type tunDevice struct {
 	ipv4     bool
 	ipv6     bool
 	persist  bool
+	fd       int
 }
 
 var nativeTunCmd = &cobra.Command{
@@ -169,6 +170,12 @@ var nativeTunCmd = &cobra.Command{
 			return
 		}
 
+		fd, err := cmd.Flags().GetInt("fd")
+		if err != nil {
+			cmd.Printf("Failed to get fd flag: %v\n", err)
+			return
+		}
+
 		t := &tunDevice{
 			name:     interfaceName,
 			mtu:      mtu,
@@ -176,6 +183,7 @@ var nativeTunCmd = &cobra.Command{
 			ipv4:     !tunnelIPv4,
 			ipv6:     !tunnelIPv6,
 			persist:  persist,
+			fd:       fd,
 		}
 
 		dev, err := t.create()
@@ -231,5 +239,6 @@ func init() {
 	nativeTunCmd.Flags().Bool("persist", false, "Linux only: Keep the TUN interface after exit")
 	nativeTunCmd.Flags().String("on-connect", "", "Path to an executable to run after each successful tunnel connect (no args; context via USQUE_* env vars)")
 	nativeTunCmd.Flags().String("on-disconnect", "", "Path to an executable to run after each tunnel disconnect (no args; context via USQUE_* env vars)")
+	nativeTunCmd.Flags().Int("fd", -1, "Linux only: use an existing, already-configured TUN file descriptor instead of creating a new device (e.g. Android VpnService integration). Skips iproute2 setup; pair with --no-iproute2 for clarity.")
 	rootCmd.AddCommand(nativeTunCmd)
 }

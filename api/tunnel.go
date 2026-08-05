@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -147,6 +148,31 @@ func (w *WaterAdapter) WritePacket(pkt []byte) error {
 // NewWaterAdapter creates a new WaterAdapter.
 func NewWaterAdapter(iface *water.Interface) TunnelDevice {
 	return &WaterAdapter{iface: iface}
+}
+
+// FDAdapter wraps a raw, already-open TUN file descriptor so it satisfies
+// TunnelDevice. Used when the caller supplies an fd instead of asking usque
+// to create its own TUN device (e.g. Android VpnService, systemd socket
+// activation-style handoff) since the caller typically lacks permission to
+// open /dev/net/tun or run the TUNSETIFF ioctl itself.
+type FDAdapter struct {
+	f *os.File
+}
+
+func (f *FDAdapter) ReadPacket(buf []byte) (int, error) {
+	return f.f.Read(buf)
+}
+
+func (f *FDAdapter) WritePacket(pkt []byte) error {
+	_, err := f.f.Write(pkt)
+	return err
+}
+
+// NewFDAdapter wraps an existing TUN file descriptor (already created and
+// configured by the caller) as a TunnelDevice, without opening or
+// configuring a new device.
+func NewFDAdapter(fd int) TunnelDevice {
+	return &FDAdapter{f: os.NewFile(uintptr(fd), "tun-fd")}
 }
 
 // pumpShutdownGrace bounds how long the supervisor waits for both forwarding
